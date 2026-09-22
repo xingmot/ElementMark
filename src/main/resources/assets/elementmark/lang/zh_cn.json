@@ -1,0 +1,14 @@
+{
+  "elementmark.config.title": "元素角标设置",
+  "elementmark.config.hint": "配置文件：%s",
+  "elementmark.config.font_scale": "尺寸：%s",
+  "elementmark.config.scroll": "滚动方式：%s",
+  "elementmark.config.preview": "样例物品预览（每项下方为其缩写）",
+  "elementmark.config.reload": "重新读取配置",
+  "elementmark.scroll.sway": "左右摆动",
+  "elementmark.scroll.loop": "单向循环",
+  "elementmark.corner.top_left": "角落：左上",
+  "elementmark.corner.top_right": "角落：右上",
+  "elementmark.corner.bottom_left": "角落：左下",
+  "elementmark.corner.bottom_right": "角落：右下"
+}

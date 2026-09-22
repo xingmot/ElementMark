@@ -32,3 +32,5 @@ bin/
 # fabric
 
 run/
+/compile.log
+/build_log.txt

@@ -1,0 +1,14 @@
+{
+  "elementmark.config.title": "Element Mark Settings",
+  "elementmark.config.hint": "Config file: %s",
+  "elementmark.config.font_scale": "Size: %s",
+  "elementmark.config.scroll": "Scroll: %s",
+  "elementmark.config.preview": "Sample items (abbreviation shown below each)",
+  "elementmark.config.reload": "Reload Config",
+  "elementmark.scroll.sway": "Sway",
+  "elementmark.scroll.loop": "Loop",
+  "elementmark.corner.top_left": "Corner: Top Left",
+  "elementmark.corner.top_right": "Corner: Top Right",
+  "elementmark.corner.bottom_left": "Corner: Bottom Left",
+  "elementmark.corner.bottom_right": "Corner: Bottom Right"
+}
