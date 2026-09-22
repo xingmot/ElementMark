@@ -76,6 +76,11 @@ loom {
     // and want loom to stop warning you about their license
     silentMojangMappingsLicense()
 
+    // mixin refmap 输出名；elementmark.mixins.json 里的 "refmap" 字段需与此一致
+    mixin {
+        defaultRefmapName.set("elementmark.refmap.json")
+    }
+
     if (propertyBool('use_access_widener')) {
         def f = file("src/main/resources/${propertyString('access_widener_name')}.accesswidener")
         if (!f.exists()) {
