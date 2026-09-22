@@ -31,7 +31,7 @@ repositories {
     }
     maven {
         name = 'Configuration'
-        url = 'https://api.repsy.io/mvn/toma/public/'
+        url = 'https://repo.repsy.io/mvn/toma/public/'
     }
     maven {
         name = 'ModdingX Maven'
@@ -98,21 +98,9 @@ repositories {
 }
 
 dependencies {
-    // 辅助模组（modCompileOnly 编译参照 / modRuntimeOnly·modLocalRuntime 仅 dev 运行）
-    modCompileOnly("mezz.jei:jei-$project.minecraft_version-forge-api:$project.jei_version") { transitive = false }
-    modCompileOnly("mezz.jei:jei-$project.minecraft_version-common-api:$project.jei_version") { transitive = false }
-    modRuntimeOnly("mezz.jei:jei-$project.minecraft_version-forge:$project.jei_version") { transitive = false }
-    modLocalRuntime("maven.modrinth:embeddium:0.3.30+mc1.20.1")
-    modLocalRuntime("maven.modrinth:sodium-extras:forge-1.20.1-1.0.7")
-    modLocalRuntime("maven.modrinth:modern-ui:3.12.0.1")
-    modLocalRuntime("dev:jecharacters:1.20.1-forge-4.5.11-dev-shadow")
-    modRuntimeOnly("dev.ftb.mods:ftb-library-forge:2001.2.4"){ transitive = false }
-    modRuntimeOnly("dev.ftb.mods:ftb-chunks-forge:2001.3.1"){ transitive = false }
-    modRuntimeOnly("dev.ftb.mods:ftb-teams-forge:2001.3.0"){ transitive = false }
-    modRuntimeOnly("dev.ftb.mods:ftb-ultimine-forge:2001.1.5"){ transitive = false }
-
-    // 联动
-    modImplementation("maven.modrinth:jade:$project.jade_version")
+    // 重要前置
+    implementation(annotationProcessor("io.github.llamalad7:mixinextras-common:$project.mixinextras_version"))
+    implementation(include("io.github.llamalad7:mixinextras-forge:$project.mixinextras_version"))
 }
 
 shadowJar {

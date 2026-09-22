@@ -12,7 +12,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * GUI 物品左上角元素符号绘制。
- *
+ * -
  * 坐标数学：ItemRenderer.render 的 TAIL 处，外层 GUI 矩阵为
  * translate(槽位中心) * scale(16, -16, 16)，原点即物品中心、y 已翻转（determinant &lt; 0）。
  * 内层再 scale(SCALE, -SCALE, SCALE)：二次翻转让文字正立，
