@@ -9,8 +9,14 @@ import com.xingmot.elementmark.ConfigLoader;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraftforge.fluids.FluidStack;
 
 /**
  * GUI 物品角标绘制（物品栏 / 容器等真实渲染路径）。
@@ -65,6 +71,17 @@ public final class ElementMarkClient {
 
     /** 字形单位 -&gt; 物品单位换算；1 字形单位 = 0.8 屏幕像素 */
     private static final float SCALE = 0.05F;
+    /**
+     * GUI 像素空间里 1 字形单位的大小（屏幕像素）：{@code 16 × SCALE}。
+     * JEI 流体角标的绘制直接运行在 GUI 像素空间（没有物品渲染的 16 倍缩放），故用它做换算。
+     */
+    private static final float PX_PER_GLYPH = 16.0F * SCALE;
+    /**
+     * 流体条目角标的 z 抬升（GUI 像素单位，JEI/EMI 两条路径共用）：流体贴图画在 z≈0
+     * （EMI 侧内部多抬 100，仍远低于本值），取 200 稳定在贴图之上、
+     * 又不至于盖过工具提示层（约 400）。
+     */
+    private static final float FLUID_Z_LIFT = 200.0F;
     /**
      * 把矩阵原点从"图标中心"移到"图标左上角"所需的本地位移（字形单位），即 {@code -ICON_SIZE / 2}。
      *
@@ -121,16 +138,116 @@ public final class ElementMarkClient {
         // 本路径的 scale(SCALE, ...) 已承担"字形单位 -> 屏幕像素"的换算，
         // 故这里直接取 place.textScale() 用，不要再乘任何换算系数。
         BadgePlacement.Placement place = BadgePlacement.compute(font, symbol, ConfigLoader.corner());
-        float textScale = place.textScale();
 
         pose.pushPose();
         pose.scale(SCALE, -SCALE, SCALE);
 
-        // 两段平移合成一次：原点先从"图标中心"搬到"图标左上角"，再走到本角落的笔位。
+        // 两段平移合成一次：原点先从"图标中心"搬到"图标左上角"，z 抬到物品模型前面。
         // 平移必须在 scale 之前施加——PoseStack 是右乘，先调用的变换作用在更外层，
         // 于是"先平移后缩放"= T(笔位) × S(字号)，缩放锚点落在笔位上。
-        pose.translate(ANCHOR_X + place.drawX(), ANCHOR_Y + place.drawY(), Z_LIFT);
-        pose.scale(textScale, textScale, 1.0F);
+        pose.translate(ANCHOR_X, ANCHOR_Y, Z_LIFT);
+        drawBadgeText(font, symbol, place, pose, buffer, light);
+        pose.popPose();
+    }
+
+    /**
+     * JEI 流体条目的角标入口，由 {@code FluidTankRendererMixin} 在其
+     * {@code FluidTankRenderer.render} 的 TAIL 调用。
+     *
+     * @param ingredient JEI 传来的原始配料（泛型擦除后是 Object），仅处理 FluidStack
+     */
+    public static void drawJeiFluidBadge(GuiGraphics guiGraphics, Object ingredient, int x, int y) {
+        if (!(ingredient instanceof FluidStack stack) || stack.isEmpty()) {
+            return;
+        }
+        drawFluidBadgeAt(guiGraphics, stack.getFluid(), x, y);
+    }
+
+    /**
+     * EMI 流体条目的角标入口，由 {@code FluidEmiStackMixin} 在
+     * {@code FluidEmiStack.render} 的 TAIL 调用。
+     *
+     * <p>EMI 的流体图标不走 {@code ItemRenderer.render}，也不走 JEI 的
+     * {@code FluidTankRenderer}，而是由 {@code FluidEmiStack} 直接绘制流体贴图——
+     * 索引页、配方槽、侧栏全部经过这一个方法，故它是 EMI 侧的唯一注入点。
+     * 流体栈未被 EMI 批处理烘焙（{@code StackBatcher$Batchable} 只由物品栈实现），
+     * 该方法按帧执行，角标随之持续可见。
+     *
+     * @param fluid EMI 流体栈内的流体本体
+     */
+    public static void drawEmiFluidBadge(GuiGraphics guiGraphics, Fluid fluid, int x, int y) {
+        if (fluid == null || fluid.isSame(Fluids.EMPTY)) {
+            return;
+        }
+        drawFluidBadgeAt(guiGraphics, fluid, x, y);
+    }
+
+    /**
+     * 模组自有 GUI widget（GT / lowdraglib 流体槽）里的流体角标入口。
+     *
+     * <p>与 {@link #drawEmiFluidBadge} 的区别在于<b>绘制时机与场景</b>：这类 widget 的
+     * {@code drawInBackground} 既服务配方查看器里的配方界面，也服务机器自己的 GUI
+     * （储罐、处理器的流体格），而角标只应出现在配方查看器里——故先按当前屏幕的
+     * 类名前缀判断是否为 EMI / JEI 的界面，不是则直接跳过。
+     *
+     * <p>屏幕类型用<b>类名前缀</b>判断而不是 instanceof：本方法可能在 EMI / JEI
+     * 未安装时被调用（mixin 已按条件加载，但 LDLib 存在而 EMI 不存在是合法组合），
+     * 直接引用它们的类会在解析时抛 {@code NoClassDefFoundError}。
+     *
+     * @param x,y 流体槽内居中 16×16 图标区的左上角（槽位坐标，非屏幕坐标）
+     */
+    public static void drawGuiFluidBadge(GuiGraphics guiGraphics, Fluid fluid, int x, int y) {
+        if (fluid == null || fluid.isSame(Fluids.EMPTY)) {
+            return;
+        }
+        Screen screen = Minecraft.getInstance().screen;
+        if (screen == null) {
+            return;
+        }
+        String name = screen.getClass().getName();
+        if (!name.startsWith("dev.emi.emi.") && !name.startsWith("mezz.jei.")) {
+            return;
+        }
+        drawFluidBadgeAt(guiGraphics, fluid, x, y);
+    }
+
+    /**
+     * 配方查看器（JEI/EMI 共用）流体角标的实际绘制。
+     *
+     * <p>坐标直接是 GUI 像素空间：{@code (x, y)} 是流体图标的左上角，
+     * 图标区按 16×16 像素 = {@link BadgePlacement#ICON_SIZE} 字形单位见方，
+     * 于是 {@code PX_PER_GLYPH} 的缩放让这套路径与物品路径共用同一份
+     * {@link BadgePlacement} 定位。GUI 空间 y 本来就向下，
+     * 不需要物品路径里那次负号翻转。
+     */
+    private static void drawFluidBadgeAt(GuiGraphics guiGraphics, Fluid fluid, int x, int y) {
+        String symbol = BadgeResolver.resolveFluid(fluid);
+        if (symbol == null) {
+            return;
+        }
+
+        Font font = Minecraft.getInstance().font;
+        BadgePlacement.Placement place = BadgePlacement.compute(font, symbol, ConfigLoader.corner());
+
+        PoseStack pose = guiGraphics.pose();
+        pose.pushPose();
+        pose.translate(x, y, FLUID_Z_LIFT);
+        pose.scale(PX_PER_GLYPH, PX_PER_GLYPH, PX_PER_GLYPH);
+        drawBadgeText(font, symbol, place, pose, guiGraphics.bufferSource(), LightTexture.FULL_BRIGHT);
+        pose.popPose();
+        // 立刻结算，保证文字盖在流体贴图上，不受后续渲染状态影响
+        guiGraphics.bufferSource().endBatch();
+    }
+
+    /**
+     * 在"图标左上角为原点、单位 = 字形单位、y 向下"的坐标域里绘制角标文字
+     * （物品路径与 JEI 路径各自先变换到这个域，此后共用同一份定位与滚动/裁剪逻辑）。
+     */
+    private static void drawBadgeText(Font font, String symbol, BadgePlacement.Placement place,
+                                      PoseStack pose, MultiBufferSource buffer, int light) {
+        pose.pushPose();
+        pose.translate(place.drawX(), place.drawY(), 0.0F);
+        pose.scale(place.textScale(), place.textScale(), 1.0F);
 
         // 在缩放域里画在原点，于是缩放锚点就是上面的笔位。
         Matrix4f matrix = pose.last().pose();
@@ -139,7 +256,7 @@ public final class ElementMarkClient {
             drawScrolling(font, symbol, place, matrix, buffer, light);
         } else {
             // 描边偏移要除以字号，才能在屏幕上恒为 1 字形单位。
-            float edge = 1.0F / textScale;
+            float edge = 1.0F / place.textScale();
             // 沿 chemlib 的双层画法：深灰偏移垫底当描边，白色主体
             font.drawInBatch(symbol, edge, edge, COLOR_EDGE, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, light);
             font.drawInBatch(symbol, 0.0F, 0.0F, COLOR_FILL, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, light);

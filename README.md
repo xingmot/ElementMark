@@ -2,14 +2,40 @@
 
 给 GUI 中的材料物品绘制化学元素符号角标（Zn、Cu、Fe……），位置可选四个角落。
 
-不绑定任何具体模组：符号通过物品的 **矿辞 tag（ore dictionary / common tag）** 解析，因此凡是遵循 `c:` / `forge:` 材料 tag 规范的模组（格雷科技、ChemLib、Create 等）都能自动生效。
+不绑定任何具体模组：符号通过物品的 **矿辞 tag（ore dictionary / common tag）** 解析（流体容器则按流体注册 ID），因此凡是遵循 `c:` / `forge:` 材料 tag 规范的模组（格雷科技、ChemLib、Create 等）都能自动生效。
 
 ## 工作原理
 
 1. 客户端 mixin 注入 `ItemRenderer.render` 的 `TAIL`，仅在 GUI 展示语境下追加绘制。
-2. `BadgeResolver` 读取物品 `Holder` 上的 tag，只认 `c:` / `forge:` 命名空间、路径形如 `<form>/<material>` 的 tag（如 `c:plates/zinc`），取 `/` 后段作为材料名。
-3. 材料名先查**用户配置**，再查内置 118 元素表；命中则绘制缩写，两处都无命中则不绘制。
-4. 结果按 `Item` 缓存在 `ConcurrentHashMap`，每个物品只解析一次；配置重载时清空缓存。
+2. `BadgeResolver` 按两条途径解析材料名，先命中先用：
+   - **物品 tag**：读取物品 `Holder` 上的 tag，只认 `c:` / `forge:` 命名空间、路径形如 `<form>/<material>` 的 tag（如 `c:plates/zinc`），取 `/` 后段作为材料名；
+   - **流体**：桶这类物品不带材料类 tag，改用桶内**流体的注册 ID** 反查（`gtceu:soldering_alloy_bucket` 装的流体是 `gtceu:soldering_alloy` → `soldering_alloy`）。
+3. 材料名查表时除原名外还尝试形态变体，剥掉形态标记后仍是同一个材料：
+   `raw_lead`（粗矿块 tag 段）、`molten_steel` / `liquid_oxygen`（熔融/液化流体）、`iron_plasma`（等离子体）。**全名永远优先**，`black_bronze`、`red_steel` 这类"前缀是材料名一部分"的真材料不会被误剥。
+4. 材料名先查**用户配置**，再查内置 118 元素表；命中则绘制缩写，两处都无命中则不绘制。
+5. 结果按 `Item` / `Fluid` 分别缓存在 `ConcurrentHashMap`，每个物品只解析一次；配置重载时清空缓存（F3+T 会一并触发，所以新打的 tag 也会立即生效）。
+6. **JEI 流体条目**：JEI 画流体图标走的是它自己的 `FluidTankRenderer`（不经过 `ItemRenderer.render`），故另有一支 mixin 挂在它的 `render(GuiGraphics, T, x, y)` 上，在流体贴图之上叠画角标。JEI 未安装时该 mixin 的目标类不会加载，自然不生效。 **流体槽（TankWidget）另有一条路**：带容量/液位的流体槽（GT 配方界面、ExtendedAE 电路切片器等）由 EMI 的 TankWidget 渲染，它重写了 drawStack、按 16px 瓦片逐行画液位而不经过 FluidEmiStack.render，故另有 TankWidgetMixin 挂其 `RETURN` 叠画角标（两条路互不重叠、不会双重绘制）。 **GT / lowdraglib 模组的配方界面走的是完全独立的第三条路**：它们的流体槽由各自的 GUI widget（GT 的 TankWidget 直接继承 LDLib 的 Widget）在 ``drawInBackground`` 里直接画贴图，EMI/JEI 的栈渲染完全不参与，故另有两支 mixin 分别挂 GT 与 LDLib 的 TankWidget；JEI 桥接的模组（无 EMI 插件、只有 JEI 集成，如 ExtendedAE）在 EMI 里则经 JEMI 桥接渲染——`JemiStackMixin` 覆盖栈自身渲染的那条路，`JemiSlotWidgetMixin` 覆盖 `JemiSlotWidget` 覆写的 `drawStack`（它不复用 `SlotWidget.drawStack`，而是直接取 JEI 的 `IIngredientRenderer` 画，两条 EMI 侧注入都碰不到它）。这些 widget 同时服务机器自身 GUI，故只在当前屏幕为 EMI/JEI 时绘制（按屏幕类名前缀判断，避免引用可能不存在的类）。**取流体的来源必须与该 widget 实际绘制的来源一致**：GT 的 `TankWidget.drawInBackground` 画的是字段 `lastFluidInTank`，而公开方法 `getFluid()` 只在 `isClientSideWidget` / `isRemote()` 为真时才返回它，否则回落到 `fluidTank`——配方界面里 GT 会把流体槽 handler 换成 `EmptyFluidHandler`（见 `GTEmiRecipe.addWidgets`），此时 `getFluid()` 为空但流体照画，表现为"贴图有、角标没有"。故 GT / LDLib 两支均以 `lastFluidInTank` 为主、`getFluid()` 兜底。同理，EMI 槽位的准入也不假设"配料恰好一项"——GT 在 JEI 共存时会把流体包成 `ClickableIngredient` 交给 EMI（`TankWidget$JEICallWrapper.getJEIFluidClickable`），故按 EMI `drawStack` 的语义遍历 `getEmiStacks()` 取第一个流体栈。
+7. **EMI 流体条目**：EMI 的流体图标由 `FluidEmiStack.render(GuiGraphics, x, y, delta, flags)` 直接绘制（内部经 `EmiAgnos.renderFluid`），是索引页 / 配方槽 / 侧栏的唯一每帧入口，故 mixin 挂在这里（只在 `RENDER_ICON` 位时绘制）。流体栈未被 EMI 批处理烘焙（`StackBatcher$Batchable` 只由物品栈实现），该方法按帧执行，角标持续可见。EMI / JEI 两套绘制路径共用同一份 `BadgePlacement` 定位与 `BadgeResolver.resolveFluid` 解析。
+
+七支配方查看器 mixin（JEI / EMI 栈 / EMI 槽 / JemiStack / JemiSlotWidget / GT 槽 / LDLib 槽）的加载由 `MixinConditions`（mixins.json 的 `plugin`）按运行环境中对应模组是否存在决定；`require = 0` 保证版本差异时只静默失效。启动时日志里会有一行 `mixin 条件插件已加载 | jei=… emi=… gtceu=… ldlib=…`，被跳过的 mixin 以 INFO 单独打出——这行是"某个配方查看器没角标"时最先该看的东西。
+
+> **开发注意：只想"画完之后再叠一层"时，用 `RETURN` 而不是 `TAIL`。** Mixin 的语义是 `RETURN` = 命中**全部** return 指令，`TAIL` = 只命中**最后一个** return（见 `InjectionPoint` javadoc）。目标方法只要有"取到配料 → 画 → 提前 return"这种写法，`TAIL` 就只会挂在"没画东西"的那条收尾支路上，注入静默失效、且不会报错（`require = 0` 时连警告都没有）。
+>
+> 实证（EMI 1.1.24 字节码）：`dev.emi.emi.api.widget.TankWidget.drawStack` 有 `307: return`（循环体内，取到流体、画完液位后）与 `311: return`（配料里没有流体键）两个 return；`dev.emi.emi.jemi.widget.JemiSlotWidget.drawStack` 有 `140: return`（已交给 JEI 渲染器画完）与 `154: return`（回落 `super.drawStack`）。两支早先都写的 `TAIL`，于是"有液位的流体槽"一直没有角标，而"空槽"那条支路反而会触发——症状表现为"EMI 环境下配方界面带数量的流体槽没角标，关掉 EMI 换 JEI 就正常"。
+>
+> 反过来，注入点落在哪儿也依赖目标方法的形状，因此**改动目标模组版本时要重新看一眼目标方法的 return 布局**：`ItemRenderer.render` 那支依赖"末尾 popPose 之后"的矩阵状态，只能留在 `TAIL`（该方法只有一个 return，两者等价）；GT / LDLib 的 `TankWidget.drawInBackground` 同样只有一个 return。
+
+> **开发注意：编译期依赖的版本必须与目标实例实装的版本一致。** GT / LDLib 的目标类（`com.gregtechceu.gtceu.api.gui.widget.TankWidget` 等）在 GTCEu 旧版本线（如 1.4.x）里并不存在，版本不对会直接编译失败；即便能编译，签名漂移也只会让注入静默失效。`gradle.properties` 里的 `gtceu_version` / `ldlib_version` / `jei_version` 对应 `modCompileOnly`，仅用于编译期解析目标类与 dev 环境验证，不打包进发布 jar。
+
+**整合包作者的捷径**：自定义物品（KubeJS `event.create` 等）没有材料 tag，给它挂一个 `c:badge/<材料名>` 的 tag 即可被解析——`badge` 这个"形态"不被任何配方消费，纯属解析挂载点：
+
+```js
+ServerEvents.tags('item', event => {
+  event.add('c:badge/white_sugar', 'kubejs:white_sugar')
+})
+```
+
+同时在配置文件里加 `white_sugar:白砂糖` 一行。tag 随 datapack 同步到客户端，F3+T 生效。
 
 ## 配置界面
 
@@ -47,6 +73,8 @@ scroll:loop              保留段：超长缩写的移动方式，sway（左右
 ```
 
 上面三段的出厂默认就是 `top_left` / `0.9` / `loop`（代码里的 `DEFAULT_CONTENT` 与之一致）：这一套是实测比对后选定的偏好，新装玩家上手即"调好的状态"，不必自己再摸一遍。
+
+想把 118 个元素的角标从化学符号换成**中文名**（氢、氦、锂……全部单字）：仓库根目录提供现成的 [`elementmark-元素中文.txt`](elementmark-元素中文.txt)——完整覆盖内置表 121 个材料键（118 元素 + 3 组英式/美式拼写别名），整个文件替换 `config/elementmark.txt` 即可。文件必须以 UTF-8 保存；109~118 号元素的中文用字（𬬻 𬭊 鿔 等）是生僻字，显示效果取决于字体包覆盖范围。
 
 改完存盘后，按 `F3+T` 重载资源即可生效，无需重启游戏。配置界面里也有「重新读取配置」按钮，改完 `font_scale` 不用来回退出界面。
 
@@ -229,6 +257,16 @@ scale(16, 16, 16)                   // ★ 三分量全正
 | Minecraft | 1.20.1 |
 | Forge | 47.x |
 | 侧 | 仅客户端（纯渲染，服务端不需要装） |
+
+## 排查"某个界面没有角标"
+
+配方查看器侧有七支注入，各有各的座位（见「工作原理」）。定位顺序：
+
+1. **做 A/B：只留 EMI、只留 JEI 各跑一次。** 两次都缺 → 问题在共用路径（配置文件 / 元素表）；只有一侧缺 → 落在那一侧的注入上。本项目最后就是靠这一步把范围从"流体槽都没角标"缩到"EMI 环境下带液位的流体槽没角标"。
+2. **看日志**：启动那行 `mixin 条件插件已加载` 说明四侧模组是否都被识别到；INFO 里若有 `mixin 跳过（目标模组不存在）`，那就是答案；其余放行/已应用决定在 DEBUG。
+3. **注入已应用但仍无角标** → 说明这个界面画的不是这几类 widget。此时给候选方法临时加一行输出做二分：**dev 环境（IDEA 直接运行）的 `System.out` 只进 IDE 控制台，`logs/latest.log` 里一条都没有**，落盘（写文件）或走 log4j 才能稳定读到。诊断输出只在排查期加，定位完就摘干净——发布版里不该付每帧写文件的代价。
+
+同一界面上"有的槽有角标、有的没有"也是有用的信号：它通常意味着这些槽<b>不是同一个绘制者</b>（本项目里"不显示数量的水有角标"正是因为它属于 `io == RENDER_ONLY` 的槽，GT 没把它交给 EMI 覆盖层画，走的还是 GT 树自己那条路）。
 
 ## 构建
 

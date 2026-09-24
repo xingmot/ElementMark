@@ -1,0 +1,156 @@
+# Element Mark config —— 元素周期表中文版
+#
+# 用法：整个文件替换 config/elementmark.txt，进游戏后自动生效（也可按 F3+T 立即刷新）。
+# 覆盖了内置元素表全部 118 个元素 + 3 组英式/美式拼写别名（共 121 条），
+# 所有元素名称均为单个汉字。注意：
+#   - 文件必须以 UTF-8 保存（模组按 UTF-8 读取）；
+#   - 109~118 号的中文用字（𬬻 𬭊 𬭳 𬭛 𬭶 鿏 𫟼 𬬭 鿔 鿭 𫓧 镆 𫟅 鿬 鿫）属生僻字，
+#     依赖字体包的覆盖范围，默认 Unifont 可以显示但字形很小；
+#   - 不想显示某个元素时，把对应行的值留空即可（如 "lead:" 隐藏铅的角标）。
+#
+# 保留段（corner / font_scale / scroll）在文件末尾，可按需修改。
+
+# ── 第 1~2 周期 ──
+hydrogen:氢
+helium:氦
+lithium:锂
+beryllium:铍
+boron:硼
+carbon:碳
+nitrogen:氮
+oxygen:氧
+fluorine:氟
+neon:氖
+
+# ── 第 3 周期 ──
+sodium:钠
+magnesium:镁
+aluminium:铝
+aluminum:铝
+silicon:硅
+phosphorus:磷
+sulfur:硫
+sulphur:硫
+chlorine:氯
+argon:氩
+
+# ── 第 4 周期 ──
+potassium:钾
+calcium:钙
+scandium:钪
+titanium:钛
+vanadium:钒
+chromium:铬
+manganese:锰
+iron:铁
+cobalt:钴
+nickel:镍
+copper:铜
+zinc:锌
+gallium:镓
+germanium:锗
+arsenic:砷
+selenium:硒
+bromine:溴
+krypton:氪
+
+# ── 第 5 周期 ──
+rubidium:铷
+strontium:锶
+yttrium:钇
+zirconium:锆
+niobium:铌
+molybdenum:钼
+technetium:锝
+ruthenium:钌
+rhodium:铑
+palladium:钯
+silver:银
+cadmium:镉
+indium:铟
+tin:锡
+antimony:锑
+tellurium:碲
+iodine:碘
+xenon:氙
+
+# ── 第 6 周期 ──
+caesium:铯
+cesium:铯
+barium:钡
+lanthanum:镧
+cerium:铈
+praseodymium:镨
+neodymium:钕
+promethium:钷
+samarium:钐
+europium:铕
+gadolinium:钆
+terbium:铽
+dysprosium:镝
+holmium:钬
+erbium:铒
+thulium:铥
+ytterbium:镱
+lutetium:镥
+hafnium:铪
+tantalum:钽
+tungsten:钨
+rhenium:铼
+osmium:锇
+iridium:铱
+platinum:铂
+gold:金
+mercury:汞
+thallium:铊
+lead:铅
+bismuth:铋
+polonium:钋
+astatine:砹
+radon:氡
+
+# ── 第 7 周期 ──
+francium:钫
+radium:镭
+actinium:锕
+thorium:钍
+protactinium:镤
+uranium:铀
+neptunium:镎
+plutonium:钚
+americium:镅
+curium:锔
+berkelium:锫
+californium:锎
+einsteinium:锿
+fermium:镄
+mendelevium:钔
+nobelium:锘
+lawrencium:铹
+rutherfordium:𬬻
+dubnium:𬭊
+seaborgium:𬭳
+bohrium:𬭛
+hassium:𬭶
+meitnerium:鿏
+darmstadtium:𫟼
+roentgenium:𬬭
+copernicium:鿔
+nihonium:鿭
+flerovium:𫓧
+moscovium:镆
+livermorium:𫟷
+tennessine:鿬
+oganesson:鿫
+
+# ── 保留段 ──
+
+# Where the abbreviation sits inside the item slot
+corner:top_left
+
+# Size of the abbreviation. 1 = fit-to-icon only; bigger / smaller scales it further.
+# The in-game config screen edits this same value with a slider.
+font_scale:0.9
+
+# How an over-long abbreviation moves. The in-game config screen flips this too.
+scroll:loop

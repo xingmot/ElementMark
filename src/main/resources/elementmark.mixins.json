@@ -4,10 +4,18 @@
     "package": "com.xingmot.elementmark.mixin",
     "compatibilityLevel": "JAVA_17",
     "refmap": "elementmark.refmap.json",
+    "plugin": "com.xingmot.elementmark.mixin.MixinConditions",
     "mixins": [],
     "server": [],
     "client": [
-        "ItemRendererMixin"
+        "ItemRendererMixin",
+        "jei.FluidTankRendererMixin",
+        "emi.FluidEmiStackMixin",
+        "emi.TankWidgetMixin",
+        "emi.JemiSlotWidgetMixin",
+        "emi.JemiStackMixin",
+        "gt.TankWidgetMixin",
+        "ldlib.TankWidgetMixin"
     ],
     "injectors": {
         "defaultRequire": 1

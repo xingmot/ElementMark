@@ -101,6 +101,24 @@ dependencies {
     // 重要前置
     implementation(annotationProcessor("io.github.llamalad7:mixinextras-common:$project.mixinextras_version"))
     implementation(include("io.github.llamalad7:mixinextras-forge:$project.mixinextras_version"))
+
+    modCompileOnly("mezz.jei:jei-$project.minecraft_version-forge:$project.jei_version") { transitive = false }
+    modCompileOnly "dev.emi:emi-forge:${project.emi_version}"
+//    modRuntimeOnly("mezz.jei:jei-$project.minecraft_version-forge:$project.jei_version") { transitive = false }
+    modRuntimeOnly "dev.emi:emi-forge:${project.emi_version}"
+
+    // GTCEu / LDLib：Mixin 注解处理器在编译期需要解析 @Mixin 的目标类
+    // （com.gregtechceu.gtceu.api.gui.widget.TankWidget、com.lowdragmc.lowdraglib.gui.widget.TankWidget），
+    // 故必须出现在 compileClasspath 上；modRuntimeOnly 仅用于 dev 环境跑起来验证注入。
+    // 版本必须与整合包实装的版本一致（否则目标类/字段可能不存在），发布出的 jar 不含它们。
+    modCompileOnly("com.lowdragmc.ldlib:ldlib-forge-$project.minecraft_version:$project.ldlib_version") { transitive = false }
+    modCompileOnly("com.gregtechceu.gtceu:gtceu-$project.minecraft_version:$project.gtceu_version:slim") { transitive = false }
+
+    modRuntimeOnly("com.tterrag.registrate:Registrate:$project.registrate_version")
+    modRuntimeOnly("dev.toma.configuration:configuration-$project.minecraft_version:$project.configuration_version-forge") { transitive = false }
+    modRuntimeOnly("com.lowdragmc.ldlib:ldlib-forge-$project.minecraft_version:$project.ldlib_version") { transitive = false }
+    modRuntimeOnly("com.gregtechceu.gtceu:gtceu-$project.minecraft_version:$project.gtceu_version:slim") { transitive = false }
+
 }
 
 shadowJar {

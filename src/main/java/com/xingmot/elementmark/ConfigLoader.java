@@ -169,6 +169,10 @@ public final class ConfigLoader {
             #   <material>:<abbreviation>   draw <abbreviation> on items whose c:/forge: tag material
             #                               matches <material>, e.g. "zinc" matches c:plates/zinc
             #                               leave the value empty to hide the badge for that material
+            #                               Fluid buckets match by their fluid id instead
+            #                               (gtceu:soldering_alloy_bucket -> soldering_alloy);
+            #                               form markers raw_/molten_/liquid_/_plasma are
+            #                               stripped automatically (full names win).
             #   corner:<position>           where to draw: top_left | top_right | bottom_left | bottom_right
             #   font_scale:<number>         size of the abbreviation: multiplier on top of the automatic
             #                               fit-to-icon scaling, clamped to 0.9 ~ 1.1; 1 = automatic only
